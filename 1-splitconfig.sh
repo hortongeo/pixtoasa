@@ -48,8 +48,9 @@ do
 done
 
 # ACL
+mkdir PIX/ACLS
 ACLS=`egrep "^access-group " $CONFIG | cut -d " " -f 2 | sort | uniq`
 for ACL in $ACLS
 do
-	egrep "^access-list $ACL " $CONFIG > PIX/$ACL
+	egrep "^access-list $ACL " $CONFIG > PIX/ACLS/$ACL
 done
