@@ -4,6 +4,33 @@
 #
 # George Horton - 5/14
 
+# Functions
+function progress_bar {
+	case $PROGRESS in
+	0)
+		echo -en "\e[0K\r-"
+		;;
+	10)
+		echo -en "\e[0K\r\\"
+		;;
+	20)
+		echo -en "\e[0K\r|"
+		;;
+	30)
+		echo -en "\e[0K\r/"
+		;;
+	99)
+		echo -en "\e[0K\r "
+		echo -en "\e[0K\r"
+		;;
+	esac
+	let PROGRESS=$PROGRESS+1
+
+	if [ $PROGRESS -gt 39 ]
+	then
+		PROGRESS=0
+	fi
+}
 # Global
 if [ "$1" == "" ]
 then
@@ -13,16 +40,19 @@ fi
 
 ASAVER=$1
 
-echo "Cleaning up existing DIRs "
+echo "Cleaning up existing DIRs"
 rm -rf ASA
 mkdir ASA
 
 # Names are still useful, copy these over
-echo "Copy over existing names "
+echo "Copy over existing names"
 cp PIX/name ASA/name
 
 # names to objects
-echo -n "Converting names to objects "
+echo "Converting names to objects"
+PROGRESS=0
+progress_bar
+
 cp PIX/object ASA/object
 rm -f .tmp-multiobject
 rm -f .tmp-object
@@ -126,22 +156,25 @@ do
                         fi
                 done
 	fi
-	echo -n "."
+	progress_bar
 done < PIX/name
-echo
+PROGRESS=99
+progress_bar
 
 # Update the object-groups with the new objects
 cp PIX/object-group ASA/object-group
-echo -n "Updating object-groups with the new objects "
+echo "Updating object-groups with the new objects"
+PROGRESS=0
+progress_bar
 
-#sort out the odd ones first
+# sort out the odd ones first
 while read LINE
 do
 	REPLACE=`echo $LINE | cut -d ":" -f 1`
 	FIND=`echo $LINE | cut -d ":" -f 2`
 
 	sed -i "s/$FIND/object $REPLACE/" ASA/object-group
-	echo -n "."
+	progress_bar
 done < .tmp-multiobject
 
 while read LINE
@@ -150,7 +183,39 @@ do
         FIND=`echo $LINE | cut -d ":" -f 2`
 
         sed -i "s/$FIND/object $REPLACE/" ASA/object-group
-	echo -n "."
+	progress_bar
 done < .tmp-multi
-echo
+PROGRESS=99
+progress_bar
 
+# Update tyhe ACLS with the new objects
+cp -r PIX/ACLS ASA
+
+for ACL in `ls ASA/ACLS`
+do
+	echo "Updating ACL $ACL with the new objects"
+	PROGRESS=0
+	progress_bar
+	while read LINE
+	do
+	        REPLACE=`echo $LINE | cut -d ":" -f 1`
+	        FIND=`echo $LINE | cut -d ":" -f 2`
+	
+	        sed -i "s/$FIND/object $REPLACE/" ASA/ACLS/$ACL
+	        progress_bar
+	done < .tmp-multiobject
+
+	while read LINE
+	do
+	        REPLACE=`echo $LINE | cut -d ":" -f 1`
+	        FIND=`echo $LINE | cut -d ":" -f 2`
+	
+	        sed -i "s/$FIND/object $REPLACE/" ASA/ACLS/$ACL
+	        progress_bar
+	done < .tmp-multi
+	PROGRESS=99
+	progress_bar
+
+done
+
+echo "Done!"
