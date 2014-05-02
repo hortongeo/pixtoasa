@@ -13,15 +13,19 @@ fi
 
 ASAVER=$1
 
+echo "Cleaning up existing DIRs "
 rm -rf ASA
 mkdir ASA
 
 # Names are still useful, copy these over
+echo "Copy over existing names "
 cp PIX/name ASA/name
 
 # names to objects
+echo -n "Converting names to objects "
 cp PIX/object ASA/object
 rm -f .tmp-multiobject
+rm -f .tmp-object
 
 while read LINE
 do
@@ -104,6 +108,7 @@ do
 		done
 	elif [ $HOST -eq 1 ]
 	then
+		echo "$NAME:host $IP" >> .tmp-multi
                 echo -e "object network $NAME\n host $IP" >> ASA/object
                 if [ "$DESC" != "" ]
                 then
@@ -113,6 +118,7 @@ do
 	then
                 for SUBNET in $SUBNETS
                 do
+			echo "$NAME:$IP $SUBNET" >> .tmp-multi
                         echo -e "object network $NAME\n subnet $IP $SUBNET" >> ASA/object
                         if [ "$DESC" != "" ]
                         then
@@ -120,5 +126,31 @@ do
                         fi
                 done
 	fi
-	
+	echo -n "."
 done < PIX/name
+echo
+
+# Update the object-groups with the new objects
+cp PIX/object-group ASA/object-group
+echo -n "Updating object-groups with the new objects "
+
+#sort out the odd ones first
+while read LINE
+do
+	REPLACE=`echo $LINE | cut -d ":" -f 1`
+	FIND=`echo $LINE | cut -d ":" -f 2`
+
+	sed -i "s/$FIND/object $REPLACE/" ASA/object-group
+	echo -n "."
+done < .tmp-multiobject
+
+while read LINE
+do
+        REPLACE=`echo $LINE | cut -d ":" -f 1`
+        FIND=`echo $LINE | cut -d ":" -f 2`
+
+        sed -i "s/$FIND/object $REPLACE/" ASA/object-group
+	echo -n "."
+done < .tmp-multi
+echo
+
