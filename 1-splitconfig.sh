@@ -13,6 +13,8 @@ then
 	exit 1;
 fi
 
+#clean up first
+rm -rf PIX
 mkdir PIX
 
 # Name
@@ -54,3 +56,6 @@ for ACL in $ACLS
 do
 	egrep "^access-list $ACL " $CONFIG > PIX/ACLS/$ACL
 done
+
+# Routes
+egrep '^route ' $CONFIG > PIX/route
