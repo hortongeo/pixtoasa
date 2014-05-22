@@ -218,6 +218,9 @@ do
 
 done
 
+#access groups
+cp PIX/access-group ASA/access-group
+
 # routes
 cp PIX/route ASA/route
 

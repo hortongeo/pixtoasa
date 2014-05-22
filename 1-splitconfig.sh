@@ -56,6 +56,7 @@ for ACL in $ACLS
 do
 	egrep "^access-list $ACL " $CONFIG > PIX/ACLS/$ACL
 done
+egrep "^access-group " $CONFIG > PIX/access-group
 
 # Routes
 egrep '^route ' $CONFIG > PIX/route
