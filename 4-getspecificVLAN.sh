@@ -58,8 +58,9 @@ then
         echo "Unable to find outside interface in configuration, did you spell it right?"
         exit 1
 else
-	OUTIFLINENOFULL=`echo $OUTIFLINENOFULL | cut -d ":" -f 1`
+	OUTIFLINENO=`echo $OUTIFLINENOFULL | cut -d ":" -f 1`
 fi
+
 IP=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "ip address [0-9\.]+" | head -1 | cut -d " " -f 3`
 SUBNET=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "ip address [0-9\.]+ [0-9\.]+" | head -1 | cut -d " " -f 4`
 INNAMEIF=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "nameif [0-9a-zA-Z\-\_\.]+" | head -1 | cut -d " " -f 2`
