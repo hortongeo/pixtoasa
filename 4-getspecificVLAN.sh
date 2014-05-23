@@ -43,20 +43,23 @@ ININTERFACE=$2
 OUTINTERFACE=$3
 
 # get the interface details
-INIFLINENO=`grep $ININTERFACE $CONFIG -n | cut -d ":" -f 1`
+INIFLINENOFULL=`grep $ININTERFACE $CONFIG -n`
 if [ $? -eq 1 ]
 then
 	echo "Unable to find inside interface in configuration, did you spell it right?"
 	exit 1
+else
+	INIFLINENO=`echo $INIFLINENOFULL | cut -d ":" -f 1`
 fi
 
-OUTIFLINENO=`grep $OUTINTERFACE $CONFIG -n | cut -d ":" -f 1`
+OUTIFLINENOFULL=`grep $OUTINTERFACE $CONFIG -n`
 if [ $? -eq 1 ]
 then
         echo "Unable to find outside interface in configuration, did you spell it right?"
         exit 1
+else
+	OUTIFLINENOFULL=`echo $OUTIFLINENOFULL | cut -d ":" -f 1`
 fi
-
 IP=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "ip address [0-9\.]+" | head -1 | cut -d " " -f 3`
 SUBNET=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "ip address [0-9\.]+ [0-9\.]+" | head -1 | cut -d " " -f 4`
 INNAMEIF=`sed -n "$INIFLINENO,$ p" $CONFIG | grep -o -P "nameif [0-9a-zA-Z\-\_\.]+" | head -1 | cut -d " " -f 2`
