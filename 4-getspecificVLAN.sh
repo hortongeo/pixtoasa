@@ -102,6 +102,9 @@ done
 PROGRESS=99
 progress_bar
 
+echo "Getting associated objects"
+PROGRESS=0
+progress_bar
 OBJECTS=""
 for IP in `echo $IPS`
 do
@@ -111,6 +114,89 @@ do
 		OBJLINE=`echo $OBJLINEFULL | cut -d ":" -f 1`
 		OBJLINE=$(($OBJLINE-1))q
 		OBJ=`sed "$OBJLINE;d" ASA/object | cut -d " " -f 3`
-		echo "$IP $OBJ"
+		OBJECTS="$OBJECTS $OBJ"
 	fi
+	progress_bar
 done
+PROGRESS=99
+progress_bar
+
+echo "Getting associated object-groups"
+PROGRESS=0
+progress_bar
+OBJECTGROUPS=""
+SEDCHAR="q"
+for IP in `echo $IPS`
+do
+	IPLINE=`grep -n $IP ASA/object-group | cut -d ":" -f 1`
+	for LINENUM in $IPLINE
+	do
+		FOUND=0
+		while [ $FOUND -eq 0 ]
+		do
+			LINENUM=$(($LINENUM-1))
+			OBJECTGROUP=`sed "$LINENUM$SEDCHAR;d" ASA/object-group | egrep "^object-group"`
+			if [ $? -eq 0 ]
+			then
+				OBJECTGROUP=`echo $OBJECTGROUP | cut -d " " -f 3`
+				OBJECTGROUPS="$OBJECTGROUPS $OBJECTGROUP"
+				FOUND=1
+			fi
+			progress_bar
+		done
+	done
+done
+PROGRESS=99
+progress_bar
+
+for OBJ in `echo $OBJECTS`
+do
+        IPLINE=`grep -n $OBJ ASA/object-group | cut -d ":" -f 1`
+        for LINENUM in $IPLINE
+        do
+                FOUND=0
+                while [ $FOUND -eq 0 ]
+                do
+                        LINENUM=$(($LINENUM-1))
+                        OBJECTGROUP=`sed "$LINENUM$SEDCHAR;d" ASA/object-group | egrep "^object-group"`
+                        if [ $? -eq 0 ]
+                        then
+                                OBJECTGROUP=`echo $OBJECTGROUP | cut -d " " -f 3`
+                                OBJECTGROUPS="$OBJECTGROUPS $OBJECTGROUP"
+                                FOUND=1
+                        fi
+                        progress_bar
+                done
+        done
+done
+PROGRESS=99
+progress_bar
+
+# Get the outside ACL sorted
+echo "creating outside ACL"
+rm -rf ASA/ACLS/per-int
+mkdir -p ASA/ACLS/per-int
+
+PROGRESS=0
+progress_bar
+NEEDLES="$IPS $OBJECTS $OBJECTGROUPS"
+NEEDLES=`echo $NEEDLES | sed 's/ /\n/g' | sort | uniq`
+while read ACLLINE
+do
+	echo "looking at $ACLLINE"
+	for NEEDLE in $NEEDLES
+	do
+		MATCH=`echo $ACLLINE | grep $NEEDLE`
+		if [ $? -eq 0 ]
+		then
+			echo -e "\t$MATCH"
+			echo $MATCH >> ASA/ACLS/per-int/outside
+		fi
+		progress_bar
+	done
+done < ASA/ACLS/$OUTACL
+PROGRESS=99
+progress_bar
+
+# inside ACL
+cp ASA/ACL/$INACL ASA/ACL/per-int/
