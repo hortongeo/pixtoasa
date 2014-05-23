@@ -105,9 +105,12 @@ progress_bar
 OBJECTS=""
 for IP in `echo $IPS`
 do
-	OBJLINE=`grep $IP ASA/object -n`
-	if [ ? -eq 0]
+	OBJLINEFULL=`grep $IP ASA/object -n`
+	if [ $? -eq 0 ]
 	then
-		
+		OBJLINE=`echo $OBJLINEFULL | cut -d ":" -f 1`
+		OBJLINE=$(($OBJLINE-1))q
+		OBJ=`sed "$OBJLINE;d" ASA/object | cut -d " " -f 3`
+		echo "$IP $OBJ"
 	fi
 done
