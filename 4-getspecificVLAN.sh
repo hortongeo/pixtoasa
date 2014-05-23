@@ -102,4 +102,12 @@ done
 PROGRESS=99
 progress_bar
 
-
+OBJECTS=""
+for IP in `echo $IPS`
+do
+	OBJLINE=`grep $IP ASA/object -n`
+	if [ ? -eq 0]
+	then
+		
+	fi
+done

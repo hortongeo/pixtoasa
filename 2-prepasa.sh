@@ -69,7 +69,7 @@ do
 	# find where the IP is used
 	# 1 object-group
 	BEFORE=`grep -o -P "[a-zA-Z0-9\.\-_]+ $IP\b" PIX/object-group | cut -d " " -f 1 | sort | uniq`
-	AFTER=`grep -o -P " $IP [0-9\.]+" PIX/object-group | cut -d " " -f 3 | sort | uniq`
+	AFTER=`grep -o -P " $IP [0-9\.]+" PIX/object-group | cut -d " " -f 3 | sort | uniq | grep -f subnets`
 
 	#remove any entries for 255.255.255.255
 	HOSTSUBCNT=`echo "$AFTER" | grep "255.255.255.255" -c`
@@ -93,7 +93,7 @@ do
 
 	# 2 ACLS
 	BEFORE=`grep -o -P "[a-zA-Z0-9\.\-_]+ $IP\b" PIX/ACLS/* | cut -d " " -f 1 | sort | uniq`
-	AFTER=`grep -o -P " $IP [0-9\.]+" PIX/ACLS/* | cut -d " " -f 3 | sort | uniq`
+	AFTER=`grep -o -P " $IP [0-9\.]+" PIX/ACLS/* | cut -d " " -f 3 | sort | uniq | grep -f subnets`
 	
         #remove any entries for 255.255.255.255
         HOSTSUBCNT=`echo "$AFTER" | grep "255.255.255.255" -c`
