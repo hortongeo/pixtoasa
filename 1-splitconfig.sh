@@ -105,3 +105,26 @@ progress_bar
 # Routes
 echo "Extracting the routes"
 egrep '^route ' $CONFIG > PIX/route
+
+
+# NAT
+echo "Extracting the NAT statements"
+rm -rf PIX/NAT
+mkdir PIX/NAT
+mkdir PIX/NAT/ACLS
+
+egrep '^global ' $CONFIG > PIX/NAT/global
+egrep '^nat ' $CONFIG > PIX/NAT/nat
+egrep '^static ' $CONFIG > PIX/NAT/static
+
+PROGRESS=0
+progress_bar
+for NAT in `grep "access-list" PIX/NAT/nat | cut -d " " -f 5`
+do
+	egrep "^access-list $NAT" $CONFIG > PIX/NAT/ACLS/$NAT
+	progress_bar
+done
+PROGRESS=99
+progress_bar
+
+echo "Done!"
