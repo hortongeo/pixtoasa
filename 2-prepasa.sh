@@ -44,10 +44,6 @@ echo "Cleaning up existing DIRs"
 rm -rf ASA
 mkdir ASA
 
-# Names are still useful, copy these over
-echo "Copy over existing names"
-cp PIX/name ASA/name
-
 # names to objects
 echo "Converting names to objects"
 PROGRESS=0
@@ -55,10 +51,11 @@ progress_bar
 
 cp PIX/object ASA/object
 rm -f .tmp-multiobject
-rm -f .tmp-object
+rm -f .tmp-multi
 
 while read LINE
 do
+
 	IP=`echo $LINE | cut -d " " -f 2`
 	NAME=`echo $LINE | cut -d " " -f 3`
 	DESC=`echo $LINE | cut -d " " -f 5-`
@@ -173,7 +170,7 @@ do
 	REPLACE=`echo $LINE | cut -d ":" -f 1`
 	FIND=`echo $LINE | cut -d ":" -f 2`
 
-	sed -i "s/$FIND/object $REPLACE/" ASA/object-group
+	sed -i "s/$FIND\$/object $REPLACE/" ASA/object-group
 	progress_bar
 done < .tmp-multiobject
 
@@ -182,7 +179,7 @@ do
         REPLACE=`echo $LINE | cut -d ":" -f 1`
         FIND=`echo $LINE | cut -d ":" -f 2`
 
-        sed -i "s/$FIND/object $REPLACE/" ASA/object-group
+        sed -i "s/$FIND\$/object $REPLACE/" ASA/object-group
 	progress_bar
 done < .tmp-multi
 PROGRESS=99
@@ -201,7 +198,7 @@ do
 	        REPLACE=`echo $LINE | cut -d ":" -f 1`
 	        FIND=`echo $LINE | cut -d ":" -f 2`
 	
-	        sed -i "s/$FIND/object $REPLACE/" ASA/ACLS/$ACL
+	        sed -i "s/$FIND /object $REPLACE /" ASA/ACLS/$ACL
 	        progress_bar
 	done < .tmp-multiobject
 
@@ -210,7 +207,7 @@ do
 	        REPLACE=`echo $LINE | cut -d ":" -f 1`
 	        FIND=`echo $LINE | cut -d ":" -f 2`
 	
-	        sed -i "s/$FIND/object $REPLACE/" ASA/ACLS/$ACL
+	        sed -i "s/$FIND /object $REPLACE /" ASA/ACLS/$ACL
 	        progress_bar
 	done < .tmp-multi
 	PROGRESS=99
