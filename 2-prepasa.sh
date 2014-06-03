@@ -226,6 +226,8 @@ cp PIX/route ASA/route
 rm -rf ASA/NAT
 mkdir -p ASA/NAT
 
+echo "Processing Dynamic NAT"
+
 while read NAT
 do
         INT=`echo $NAT | cut -d " " -f 2 | sed "s/[\(\)]//g"`
@@ -281,8 +283,17 @@ do
                         if [ "$PROTO" != "ip" ]
                         then
                                 PORT=`echo $ACLLINE | cut -d " " -f 10`
-                                echo -e "object service $PROTO-$PORT\n service $PROTO destination eq $PORT" >> ASA/object
-                                PORTOBJ="$PROTO-$PORT"
+                                # try to find the port object first
+                                PORTLINENO=`grep -n " service $PROTO destination eq $PORT" ASA/object`
+                                if [ $? -eq 0 ]
+                                then
+                                        PORTLINENO=`echo $PORTLINENO | cut -d ":" -f 1`
+                                        PORTLINENO=$(($PORTLINENO-1))q
+                                        PORTOBJ=`sed "$PORTLINENO;d" ASA/object | cut -d " " -f 3`
+                                else
+                                        echo -e "object service $PROTO-$PORT\n service $PROTO destination eq $PORT" >> ASA/object
+                                        PORTOBJ="$PROTO-$PORT"
+                                fi
                         else
                                 PORTOBJ=""
                         fi
@@ -297,9 +308,16 @@ do
                                 GLOBALIP=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 4`
                                 OTHERINT=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 2 | sed "s/[\(\)]//g"`
                                 # get the object name
-                                IPLINENO=`grep -n " $GLOBALIP" ASA/object | cut -d ":" -f 1`
-                                IPLINENO=$(($IPLINENO-1))q
-                                OBJ=`sed "$IPLINENO;d" ASA/object | cut -d " " -f 3`
+                                IPLINENO=`grep -n " $GLOBALIP" ASA/object`
+                                if [ $? -eq 0 ]
+                                then
+                                        IPLINENO=`echo $IPLINENO | cut -d ":" -f 1`
+                                        IPLINENO=$(($IPLINENO-1))q
+                                        OBJ=`sed "$IPLINENO;d" ASA/object | cut -d " " -f 3`
+                                else
+                                        echo -e "object network srv-$GLOBALIP\n host $GLOVALIP"
+                                        OBJ="srv-$GLOBALIP"
+                                fi
 
                                 if [ "$PORTOBJ" == "" ]
                                 then
@@ -346,5 +364,128 @@ do
                 fi
         fi
 done < PIX/NAT/nat
+
+echo "Processing Static NAT"
+while read STATIC
+do
+        INTS=`echo $STATIC | cut -d " " -f 2 | sed "s/[\(\)]//g"`
+        INSIDEIF=`echo $INTS | cut -d "," -f 1`
+        OUTSIDEIF=`echo $INTS | cut -d "," -f 2`
+        INSIDEIP=`echo $STATIC | cut -d " " -f 4`
+        OUTSIDEIP=`echo $STATIC | cut -d " " -f 3`
+        NETMASK=`echo $STATIC | cut -d " " -f 6`
+
+        if [ "$INSIDEIP" == "access-list" ]
+        then
+                ACL=`echo $STATIC | cut -d " " -f 5`
+                while read ACLLINE
+                do
+                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 6`
+                        if [ "$HOSTCHK" == "host" ]
+                        then
+                                SOURCE=`echo $ACLLINE | cut -d " " -f 7`
+                        else
+                                SOURCE=`echo $ACLLINE | cut -d " " -f 6,7`
+                        fi
+
+                        SOURCELINENO=`grep -n " $SOURCE" ASA/object`
+                        if [ $? -eq 0 ]
+                        then
+                                SOURCELINENO=`echo $SOURCELINENO | cut -d ":" -f 1`
+                                SOURCELINENO=$(($SOURCELINENO-1))q
+                                SOURCEOBJ=`sed "$SOURCELINENO;d" ASA/object | cut -d " " -f 3`
+                        else
+                                if [ "$HOSTCHK" == "host" ]
+                                then
+                                        echo -e "object network srv-$SOURCE\n host $SOURCE"
+                                        SOURCEOBJ="srv-$SOURCE"
+                                else
+                                        PREFIX=`ipcalc -p $SOURCE`
+                                        echo -e "object network net-$SOURCE\n subnet $SOURCE"
+                                        SOURCEOBJ="net-$SOURCE"
+                                fi
+                        fi
+
+                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 8`
+                        if [ "$HOSTCHK" == "host" ]
+                        then
+                                DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
+                        else
+                                DESTINATION=`echo $ACLLINE | cut -d " " -f 8,9`
+                        fi
+
+                        DESTLINENO=`grep -n " $DESTINATION" ASA/object`
+                        if [ $? -eq 0 ]
+                        then
+                                DESTLINENO=`echo $DESTLINENO | cut -d ":" -f 1`
+                                DESTLINENO=$(($DESTLINENO-1))q
+                                DESTOBJ=`sed "$DESTLINENO;d" ASA/object | cut -d " " -f 3`
+                        else
+                                if [ "$HOSTCHK" == "host" ]
+                                then
+                                        echo -e "object network srv-$DESTINATION\n host $DESTINATION"
+                                        DESTOBJ="srv-$DESTINATION"
+                                else
+                                        PREFIX=`ipcalc -p $DESTINATION`
+                                        echo -e "object network net-$DESTINATION\n subnet $DESTINATION"
+                                        DESTOBJ="net-$DESTINATION"
+                                fi
+                        fi
+
+                        OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
+                        if [ $? -eq 0 ]
+                        then
+                                OUTSIDEIPLINE=`echo $OUTSIDEIPLINE | cut -d ":" -f 1`
+                                OUTSIDEIPLINE=$(($OUTSIDEIPLINE-1))q
+                                OUTSIDEOBJ=`sed "$OUTSIDEIPLINE;d" ASA/object | cut -d " " -f 3`
+                        else
+                                echo -e "object network srv-$OUTSIDEIP\n host $OUTSIDEIP" >> ASA/object
+                                OUTSIDEOBJ="srv-$OUTSIDEIP"
+                        fi
+
+                        echo "nat ($INSIDEIF,$OUTSIDEIF) source static $SOURCEOBJ $OUTSIDEOBJ destination static $DESTOBJ $DESTOBJ" >> ASA/NAT/static
+
+                done < PIX/NAT/ACLS/$ACL
+        else
+                INSIDEIPLINE=`grep -n " $INSIDEIP" ASA/object`
+                if [ $? -eq 0 ]
+                then
+                        # get object from file
+                        INSIDEIPLINE=`echo $INSIDEIPLINE | cut -d ":" -f 1`
+                        INSIDEIPLINE=$(($INSIDEIPLINE-1))q
+                        INSIDEOBJ=`sed "$INSIDEIPLINE;d" ASA/object | cut -d " " -f 3`
+                else
+                        if [ "$NETMASK" == "255.255.255.255" ]
+                        then
+                                echo -e "object network srv-$INSIDEIP\n host $INSIDEIP" >> ASA/object
+                                INSIDEOBJ="srv-$INSIDEIP"
+                        else
+                                PREFIX=`ipcalc -p $INSIDEIP $NETMASK | cut -d "=" -f 2`
+                                echo -e "object network net-$INSIDEIP-$PREFIX\n subnet $INSIDEIP $NETMASK" >> ASA/object
+                                INSIDEOBJ="net-$INSIDEIP-$PREFIX"
+                        fi
+                        # put object into file
+                fi
+
+                OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
+                if [ $? -eq 0 ]
+                then
+                        OUTSIDEIPLINE=`echo $OUTSIDEIPLINE | cut -d ":" -f 1`
+                        OUTSIDEIPLINE=$(($OUTSIDEIPLINE-1))q
+                        OUTSIDEOBJ=`sed "$OUTSIDEIPLINE;d" ASA/object | cut -d " " -f 3`
+                else
+                        if [ "$NETMASK" == "255.255.255.255" ]
+                        then
+                                echo -e "object network srv-$OUTSIDEIP\n host $OUTSIDEIP" >> ASA/object
+                                OUTSIDEOBJ="srv-$OUTSIDEIP"
+                        else
+                                PREFIX=`ipcalc -p $OUTSIDEIP $NETMASK | cut -d "=" -f 2`
+                                echo -e "objecvt network net-$OUTSIDEIP-$PREFIX\n subnet $OUTSIDEIP $NETMASK" >> ASA/object
+                                OUTSIDEOBJ="net-$OUTSIDEIP-$PREFIX"
+                        fi
+                fi
+                echo "nat ($INSIDEIF,$OUTSIDEIF) source static $INSIDEOBJ $OUTSIDEOBJ" >> ASA/NAT/static
+        fi
+done < PIX/NAT/static
 
 echo "Done!"
