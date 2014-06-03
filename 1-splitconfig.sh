@@ -127,4 +127,14 @@ done
 PROGRESS=99
 progress_bar
 
+PROGRESS=0
+progress_bar
+for NAT in `grep "access-list" PIX/NAT/static | cut -d " " -f 6`
+do
+        egrep "^access-list $NAT" $CONFIG > PIX/NAT/ACLS/$NAT
+        progress_bar
+done
+PROGRESS=99
+progress_bar
+
 echo "Done!"
