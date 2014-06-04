@@ -228,6 +228,8 @@ mkdir -p ASA/NAT
 
 echo "Processing Dynamic NAT"
 
+PROGRESS=0
+progress_bar
 while read NAT
 do
         INT=`echo $NAT | cut -d " " -f 2 | sed "s/[\(\)]//g"`
@@ -259,6 +261,7 @@ do
                                         SOURCE="net-$OBJGROUPCHK-$PREFIX"
                                 fi
                         fi
+			progress_bar
 
                         OBJGROUPCHK=`echo $ACLLINE | cut -d " " -f 8`
                         DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
@@ -279,6 +282,7 @@ do
                                         DESTINATION="net-$OBJGROUPCHK-$PREFIX"
                                 fi
                         fi
+			progress_bar
 
                         if [ "$PROTO" != "ip" ]
                         then
@@ -297,11 +301,12 @@ do
                         else
                                 PORTOBJ=""
                         fi
+			progress_bar
 
                         if [ $GLOBAL -eq 0 ]
                         then
                                 #NAT EXEMPT
-                                echo "nat ($INT,any) source dynamic $SOURCE $SOURCE destination $DESTINATION $DESTINATION" >> ASA/NAT/exempt
+                                echo "nat ($INT,any) source static $SOURCE $SOURCE destination static $DESTINATION $DESTINATION" >> ASA/NAT/exempt
                         else
                                 #Dynamic NAT
                                 # Get the global ip
@@ -323,9 +328,10 @@ do
                                 then
                                         echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ" >> ASA/NAT/dynamic
                                 else
-                                         echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ service $PORTOBJ" >> ASA/NAT/dynamic
+                                         echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ service $PORTOBJ $PORTOBJ" >> ASA/NAT/dynamic
                                 fi
                         fi
+			progress_bar
                 done < PIX/NAT/ACLS/$ACL
         else
                 SOURCELINENO=`grep -n "$ACLCHECK $ACL" ASA/object`
@@ -339,6 +345,7 @@ do
                         echo -e "object network net-$ACLCHECK-$PREFIX\n subnet $ACLCHECK $ACL" >> ASA/object
                         SOURCE="net-$ACLCHECK-$PREFIX"
                 fi
+		progress_bar
                 if [ $GLOBAL -eq 0 ]
                 then
                         #NAT Exempt
@@ -362,10 +369,17 @@ do
 
                         echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ" >> ASA/NAT/dynamic
                 fi
+		progress_bar
         fi
+	progress_bar
 done < PIX/NAT/nat
+PROGRESS=99
+progress_bar
 
 echo "Processing Static NAT"
+rm -f .tmp-nat
+PROGRESS=0
+progress_bar
 while read STATIC
 do
         INTS=`echo $STATIC | cut -d " " -f 2 | sed "s/[\(\)]//g"`
@@ -388,6 +402,7 @@ do
                                 SOURCE=`echo $ACLLINE | cut -d " " -f 6,7`
                         fi
 
+			progress_bar
                         SOURCELINENO=`grep -n " $SOURCE" ASA/object`
                         if [ $? -eq 0 ]
                         then
@@ -406,6 +421,7 @@ do
                                 fi
                         fi
 
+			progress_bar
                         HOSTCHK=`echo $ACLLINE | cut -d " " -f 8`
                         if [ "$HOSTCHK" == "host" ]
                         then
@@ -414,6 +430,7 @@ do
                                 DESTINATION=`echo $ACLLINE | cut -d " " -f 8,9`
                         fi
 
+			progress_bar
                         DESTLINENO=`grep -n " $DESTINATION" ASA/object`
                         if [ $? -eq 0 ]
                         then
@@ -432,6 +449,7 @@ do
                                 fi
                         fi
 
+			progress_bar
                         OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
                         if [ $? -eq 0 ]
                         then
@@ -443,9 +461,11 @@ do
                                 OUTSIDEOBJ="srv-$OUTSIDEIP"
                         fi
 
+			progress_bar
                         echo "nat ($INSIDEIF,$OUTSIDEIF) source static $SOURCEOBJ $OUTSIDEOBJ destination static $DESTOBJ $DESTOBJ" >> ASA/NAT/static
 
                 done < PIX/NAT/ACLS/$ACL
+		progress_bar
         else
                 INSIDEIPLINE=`grep -n " $INSIDEIP" ASA/object`
                 if [ $? -eq 0 ]
@@ -464,8 +484,10 @@ do
                                 echo -e "object network net-$INSIDEIP-$PREFIX\n subnet $INSIDEIP $NETMASK" >> ASA/object
                                 INSIDEOBJ="net-$INSIDEIP-$PREFIX"
                         fi
+			progress_bar
                         # put object into file
                 fi
+		progress_bar
 
                 OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
                 if [ $? -eq 0 ]
@@ -484,8 +506,29 @@ do
                                 OUTSIDEOBJ="net-$OUTSIDEIP-$PREFIX"
                         fi
                 fi
+		progress_bar
                 echo "nat ($INSIDEIF,$OUTSIDEIF) source static $INSIDEOBJ $OUTSIDEOBJ" >> ASA/NAT/static
         fi
+
+        OUTINT=`grep "0.0.0.0 0.0.0.0" PIX/route | cut -d " " -f 2`
+        OUTACL=`grep " $OUTINT" PIX/access-group | cut -d " " -f 2`
+
+        if [ "$OUTSIDEIF" == "$OUTINT" ]
+        then
+                if [ "$NETMASK" == "255.255.255.255" ]
+                then
+			echo "host $OUTSIDEIP|$OUTSIDEOBJ|$INSIDEOBJ" >> .tmp-nat
+                else
+			echo "$OUTSIDEIP $NETMASK|$OUTSIDEOBJ|$INSIDEOBJ" >> .tmp-nat
+                fi
+        fi
+	progress_bar
 done < PIX/NAT/static
+PROGRESS=99
+progress_bar
+
+echo "Fixing Outside ACL with inside IPs from NAT rules"
+OUTINT=`grep "0.0.0.0 0.0.0.0" PIX/route | cut -d " " -f 2`
+OUTACL=`grep " $OUTINT" PIX/access-group | cut -d " " -f 2`
 
 echo "Done!"
