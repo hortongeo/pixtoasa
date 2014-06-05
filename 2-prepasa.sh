@@ -31,6 +31,84 @@ function progress_bar {
 		PROGRESS=0
 	fi
 }
+
+REPLACEOBJGRP=""
+function objgrpsort {
+        local DEPTH=$(($2+1))
+        local DST=$1
+        local OBJGRPNAME=`echo "$DST" | cut -d " " -f 2`
+        OBJGRPLINENO=`grep -n "object-group network $OBJGRPNAME" ASA/object-group`
+        if [ $? -eq 0 ]
+        then
+                OBJGRPLINENO=`echo $OBJGRPLINENO | cut -d ":" -f 1`
+                OBJGRPLINENO=$((OBJGRPLINENO+1))
+                ENDLINENO=`sed -n "$OBJGRPLINENO,$ p" ASA/object-group | grep -n "object-group" | head -1 | cut -d ":" -f 1`
+                ENDLINENO=$(($ENDLINENO+OBJGRPLINENO))
+                ENDLINENO=$(($ENDLINENO-2))
+                OBJGRP=`sed -n "$OBJGRPLINENO,$ENDLINENO p" ASA/object-group`
+
+                local NEWOBJGRP="object-group network $OBJGRPNAME-UNAT"
+                REP=0
+                local OBJLINE=""
+
+		PROGRESS=0
+		progress_bar
+                while read OBJLINE
+                do
+                        REMCHK=`echo $OBJLINE | cut -d " " -f 1`
+                        if [ "$REMCHK" != "description" ]
+                        then
+                                CHK=`echo $OBJLINE | cut -d " " -f 2`
+                                if [ "$CHK" == "object" ]
+                                then
+                                        OBJ=`echo $OBJLINE | cut -d " " -f 3`
+                                else
+                                        if [ "$REMCHK" == "group-object" ]
+                                        then
+                                                # recursive
+                                                objgrpsort "$OBJLINE" $DEPTH
+                                                OBJ=`echo $OBJLINE | cut -d " " -f 2`
+                                                if [ "$OBJ" != "$REPLACEOBJGRP" ]
+                                                then
+                                                        OBJLINE="group-object $REPLACEOBJGRP"
+                                                        OBJ="||||||||||"
+                                                        REP=1
+                                                fi
+                                        else
+                                                OBJ=`echo $OBJLINE | cut -d " " -f 2,3`
+                                        fi
+                                fi
+
+                                REPLACE=`grep "$OBJ|" .tmp-nat`
+                                if [ $? -eq 0 ]
+                                then
+                                        REPLACE=`echo $REPLACE | cut -d "|" -f 3`
+                                        OBJLINE=`echo $OBJLINE | sed "s/ $OBJ/ $REPLACE/ g"`
+                                        REP=1
+                                fi
+                        fi
+			progress_bar
+                        NEWOBJGRP="$NEWOBJGRP\n $OBJLINE"
+                done <<<"$OBJGRP"
+		PROGRESS=99
+		progress_bar
+
+                if [ $REP -eq 1 ]
+                then
+                        # Check if already there
+                        OP=`grep $OBJGRPNAME-UNAT ASA/object-group`
+                        if [ $? -ne 0 ]
+                        then
+                                echo -e "$NEWOBJGRP" >> ASA/object-group
+                        fi
+                        REPLACEOBJGRP="$OBJGRPNAME-UNAT"
+                else
+                        REPLACEOBJGRP="$OBJGRPNAME"
+                fi
+        fi
+
+}
+
 # Global
 if [ "$1" == "" ]
 then
@@ -98,7 +176,7 @@ do
         then
                 TMPAFTER=`echo $AFTER | grep -v "255.255.255.255"`
                 AFTER=`echo "$TMPAFTER"`
-                HOST=1
+                GHOST=1
         fi
 
         HOSTCNT=`echo "$BEFORE" | grep "host" -c`
@@ -530,5 +608,90 @@ progress_bar
 echo "Fixing Outside ACL with inside IPs from NAT rules"
 OUTINT=`grep "0.0.0.0 0.0.0.0" PIX/route | cut -d " " -f 2`
 OUTACL=`grep " $OUTINT" PIX/access-group | cut -d " " -f 2`
+
+PROGRESS=0
+progress_bar
+while read ACL
+do
+        # Ignore remarks
+        REMCHECK=`echo $ACL | cut -d " " -f 3`
+        if [ "$REMCHECK" != "remark" ]
+        then
+                COUNT=0
+                SRC=""
+                DST=""
+                PROTO=""
+                LAST=""
+                for COL in $ACL
+                do
+                        if [ "$PROTO" == "" ]
+                        then
+                                if [ $COUNT -ge 4 ]
+                                then
+                                        if [ "$COL" == "object-group" ]
+                                        then
+                                                LAST=$COL
+                                        else
+                                                if [ "$LAST" == "" ]
+                                                then
+                                                        PROTO=$COL
+                                                else
+                                                        PROTO="$LAST $COL"
+                                                        LAST=""
+                                                fi
+                                        fi
+                                fi
+                        elif [ "$SRC" == "" ]
+                        then
+                                if [ "$COL" == "any" ]
+                                then
+                                        SRC=$COL
+                                else
+                                        if [ "$LAST" == "" ]
+                                        then
+                                                LAST=$COL
+                                        else
+                                                SRC="$LAST $COL"
+                                                LAST=""
+                                        fi
+                                fi
+                        elif [ "$DST" == "" ]
+                        then
+                                if [ "$COL" == "any" ]
+                                then
+                                        DST=$COL
+                                else
+                                        if [ "$LAST" == "" ]
+                                        then
+                                                LAST=$COL
+                                        else
+                                                DST="$LAST $COL"
+                                                LAST=""
+                                        fi
+                                fi
+                        fi
+                        COUNT=$(($COUNT+1))
+                done
+
+                # Only care about the Destination
+                if [ "$DST" != "any" ]
+                then
+                        OBJGRPCHK=`echo "$DST" | cut -d " " -f 1`
+                        if [ "$OBJGRPCHK" == "object-group" ]
+                        then
+                                objgrpsort "$DST" 0
+                                OBJGRPNAME=`echo "$DST" | cut -d " " -f 2`
+                                ACL=`echo $ACL | sed "s/ $OBJGRPNAME/ $REPLACEOBJGRP/g"`
+                        fi
+                fi
+        fi
+        echo $ACL >> .tmp-$OUTACL
+	progress_bar
+done < ASA/ACLS/$OUTACL
+PROGRESS=99
+progress_bar
+
+mv .tmp-$OUTACL ASA/ACLS/$OUTACL
+
 
 echo "Done!"
