@@ -114,15 +114,6 @@ function objgrpsort {
 
 }
 
-# Global
-if [ "$1" == "" ]
-then
-	echo "usage: 2-makeasa.sh <ASAVER>"
-	exit 1
-fi
-
-ASAVER=$1
-
 echo "Cleaning up existing DIRs"
 rm -rf ASA
 mkdir ASA
