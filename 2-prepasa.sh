@@ -83,6 +83,11 @@ function objgrpsort {
                                 if [ $? -eq 0 ]
                                 then
                                         REPLACE=`echo $REPLACE | cut -d "|" -f 3`
+					CHK=`echo $OBJ | cut -d " " -f 1`
+					if [ "$CHK" == "host" ]
+					then
+						REPLACE="object $REPLACE"
+					fi
                                         OBJLINE=`echo $OBJLINE | sed "s/ $OBJ/ $REPLACE/ g"`
                                         REP=1
                                 fi
@@ -608,6 +613,8 @@ progress_bar
 echo "Fixing Outside ACL with inside IPs from NAT rules"
 OUTINT=`grep "0.0.0.0 0.0.0.0" PIX/route | cut -d " " -f 2`
 OUTACL=`grep " $OUTINT" PIX/access-group | cut -d " " -f 2`
+
+rm -f .tmp-$OUTACL
 
 PROGRESS=0
 progress_bar
