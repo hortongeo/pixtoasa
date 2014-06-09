@@ -37,7 +37,7 @@ function objgrpsort {
         local DEPTH=$(($2+1))
         local DST=$1
         local OBJGRPNAME=`echo "$DST" | cut -d " " -f 2`
-        OBJGRPLINENO=`grep -n "object-group network $OBJGRPNAME" ASA/object-group`
+        OBJGRPLINENO=`grep -n "object-group network $OBJGRPNAME$" ASA/object-group`
         if [ $? -eq 0 ]
         then
                 OBJGRPLINENO=`echo $OBJGRPLINENO | cut -d ":" -f 1`
@@ -477,7 +477,7 @@ do
                         fi
 
 			progress_bar
-                        SOURCELINENO=`grep -n " $SOURCE" ASA/object`
+                        SOURCELINENO=`grep -n " $SOURCE$" ASA/object`
                         if [ $? -eq 0 ]
                         then
                                 SOURCELINENO=`echo $SOURCELINENO | cut -d ":" -f 1`
@@ -505,7 +505,7 @@ do
                         fi
 
 			progress_bar
-                        DESTLINENO=`grep -n " $DESTINATION" ASA/object`
+                        DESTLINENO=`grep -n " $DESTINATION$" ASA/object`
                         if [ $? -eq 0 ]
                         then
                                 DESTLINENO=`echo $DESTLINENO | cut -d ":" -f 1`
@@ -541,7 +541,7 @@ do
                 done < PIX/NAT/ACLS/$ACL
 		progress_bar
         else
-                INSIDEIPLINE=`grep -n " $INSIDEIP" ASA/object`
+                INSIDEIPLINE=`grep -n " $INSIDEIP$" ASA/object`
                 if [ $? -eq 0 ]
                 then
                         # get object from file
@@ -563,7 +563,7 @@ do
                 fi
 		progress_bar
 
-                OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
+                OUTSIDEIPLINE=`grep -n " $OUTSIDEIP$" ASA/object`
                 if [ $? -eq 0 ]
                 then
                         OUTSIDEIPLINE=`echo $OUTSIDEIPLINE | cut -d ":" -f 1`
