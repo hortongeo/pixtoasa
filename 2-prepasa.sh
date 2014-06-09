@@ -680,6 +680,22 @@ do
                                 objgrpsort "$DST" 0
                                 OBJGRPNAME=`echo "$DST" | cut -d " " -f 2`
                                 ACL=`echo $ACL | sed "s/ $OBJGRPNAME/ $REPLACEOBJGRP/g"`
+			elif [ "$OBJGRPCHK" == "object" ]
+			then
+				OBJ=`echo "$DST" | cut -d " " -f 2`
+				REPLACE=`grep "$OBJ|" .tmp-nat`
+				if [ $? -eq 0 ]
+				then
+					REPLACE=`echo $REPLACE | cut -d "|" -f 3`
+					ACL=`echo $ACL | sed "s/ $OBJ/ $REPLACE/g"`
+				fi
+			else
+				REPLACE=`grep "$DST|" .tmp-nat`
+				if [ $? -eq 0 ]
+				then
+					REPLACE=`echo $REPLACE | cut -d "|" -f 3`
+					ACL=`echo $ACL | sed "s/ $DST/ object $REPLACE/g"`
+				fi	
                         fi
                 fi
         fi
