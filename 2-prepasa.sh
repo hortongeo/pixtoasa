@@ -576,7 +576,7 @@ do
                                 OUTSIDEOBJ="srv-$OUTSIDEIP"
                         else
                                 PREFIX=`ipcalc -p $OUTSIDEIP $NETMASK | cut -d "=" -f 2`
-                                echo -e "objecvt network net-$OUTSIDEIP-$PREFIX\n subnet $OUTSIDEIP $NETMASK" >> ASA/object
+                                echo -e "object network net-$OUTSIDEIP-$PREFIX\n subnet $OUTSIDEIP $NETMASK" >> ASA/object
                                 OUTSIDEOBJ="net-$OUTSIDEIP-$PREFIX"
                         fi
                 fi
