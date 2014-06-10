@@ -199,4 +199,16 @@ PROGRESS=99
 progress_bar
 
 # inside ACL
-cp ASA/ACL/$INACL ASA/ACL/per-int/
+cp ASA/ACLS/$INACL ASA/ACLS/per-int/
+
+# Loop through both ACLS and get all objects and object groups required
+for ACL in `ls ASA/ACLS/per-int/`
+do
+	while read LINE
+	do
+		# Proto
+		# src
+		# dst
+ 		# if Proto then Port
+	done < ASA/ACLS/per-int/$ACL
+done
