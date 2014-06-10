@@ -683,14 +683,14 @@ do
 			elif [ "$OBJGRPCHK" == "object" ]
 			then
 				OBJ=`echo "$DST" | cut -d " " -f 2`
-				REPLACE=`grep "$OBJ|" .tmp-nat`
+				REPLACE=`grep -F "$OBJ|" .tmp-nat`
 				if [ $? -eq 0 ]
 				then
 					REPLACE=`echo $REPLACE | cut -d "|" -f 3`
 					ACL=`echo $ACL | sed "s/ $OBJ/ $REPLACE/g"`
 				fi
 			else
-				REPLACE=`grep "$DST|" .tmp-nat`
+				REPLACE=`grep -F "$DST|" .tmp-nat`
 				if [ $? -eq 0 ]
 				then
 					REPLACE=`echo $REPLACE | cut -d "|" -f 3`
