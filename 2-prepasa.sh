@@ -217,14 +217,21 @@ do
                 fi
 	elif [ "$SUBNETS" != "" ]
 	then
+		CNT=0
                 for SUBNET in $SUBNETS
                 do
+			if [ $CNT -ge 1 ]
+			then
+				NAME="$NAME-$CNT"
+			fi
+
 			echo "$NAME:$IP $SUBNET" >> .tmp-multi
                         echo -e "object network $NAME\n subnet $IP $SUBNET" >> ASA/object
                         if [ "$DESC" != "" ]
                         then
                                 echo -e " description $DESC" >> ASA/object
                         fi
+			CNT=$(($CNT+1))
                 done
 	fi
 	progress_bar
@@ -452,6 +459,8 @@ progress_bar
 
 echo "Processing Static NAT"
 rm -f .tmp-nat
+touch .tmp-nat
+
 PROGRESS=0
 progress_bar
 while read STATIC

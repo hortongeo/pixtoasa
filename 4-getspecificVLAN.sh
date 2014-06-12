@@ -32,6 +32,65 @@ function progress_bar {
         fi
 }
 
+function getobjects {
+        INPUT="$1"
+        local OBJLINENO=0
+        local ENDLINENO=0
+        local OBJ=""
+        local OBJGRP=""
+        local LINE=""
+        local TEST=""
+        local OUTPUT=""
+
+        local CHK=`echo $INPUT | cut -d " " -f 1`
+        if [ "$CHK" == object ]
+        then
+                OBJ=`echo $INPUT | cut -d " " -f 2`
+                OBJLINENO=`grep -n "$OBJ$" ASA/object | cut -d ":" -f 1`
+                OBJLINENO=$(($OBJLINENO+1))
+                ENDLINENO=`sed -n "$OBJLINENO,$ p" ASA/object | egrep -n "^object" | head -1 | cut -d ":" -f 1`
+                OBJLINENO=$(($OBJLINENO-1))
+                ENDLINENO=$(($OBJLINENO+$ENDLINENO-1))
+		if [ $ENDLINENO -le $OBJLINENO ]
+                then
+                        ENDLINENO="$"
+                fi
+                sed -n "$OBJLINENO,$ENDLINENO p" ASA/object >> ASA/ACLS/per-int/object
+        elif [ "$CHK" == "object-group" ] || [ "$CHK" == "group-object" ]
+        then
+                OBJGRP=`echo $INPUT | cut -d " " -f 2`
+                OBJGRPLINENO=`grep -n "object-group .* $OBJGRP" ASA/object-group | cut -d ":" -f 1`
+                OBJGRPLINENO=$(($OBJGRPLINENO+1))
+                ENDLINENO=`sed -n "$OBJGRPLINENO,$ p" ASA/object-group | egrep -n "^object-group" | head -1 | cut -d ":" -f 1`
+                OBJGRPLINENO=$(($OBJGRPLINENO-1))
+                ENDLINENO=$(($ENDLINENO+$OBJGRPLINENO-1))
+                if [ $ENDLINENO -le $OBJGRPLINENO  ]
+                then
+                        ENDLINENO="$"
+                fi
+                OBJGRP=`sed -n "$OBJGRPLINENO,$ENDLINENO p" ASA/object-group`
+                while read LINE
+                do
+                        TEST=`echo $LINE | egrep "^object-group"`
+                        if [ $? -ne 0 ]
+                        then
+                                TEST=`echo $LINE | cut -d " " -f 1`
+                                if [ "$TEST" == "network-object" ] || [ "$TEST" == "port-object" ]
+                                then
+                                        OUTPUT=`echo $LINE | cut -d " " -f 2,3`
+                                else
+                                        OUTPUT="$LINE"
+                                fi
+
+                                getobjects "$OUTPUT"
+                        fi
+                done <<<"$OBJGRP"
+		echo "$OBJGRP" >> ASA/ACLS/per-int/object-group
+        fi
+
+}
+
+
 if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ]
 then
 	echo "Usage: 3-getspecificVLAN.sh <PIX_CONFIG_FILE> <Inside Interface> <Outside Interface>"
@@ -183,13 +242,11 @@ NEEDLES="$IPS $OBJECTS $OBJECTGROUPS"
 NEEDLES=`echo $NEEDLES | sed 's/ /\n/g' | sort | uniq`
 while read ACLLINE
 do
-	echo "looking at $ACLLINE"
 	for NEEDLE in $NEEDLES
 	do
 		MATCH=`echo $ACLLINE | grep $NEEDLE`
 		if [ $? -eq 0 ]
 		then
-			echo -e "\t$MATCH"
 			echo $MATCH >> ASA/ACLS/per-int/outside
 		fi
 		progress_bar
@@ -206,9 +263,61 @@ for ACL in `ls ASA/ACLS/per-int/`
 do
 	while read LINE
 	do
-		# Proto
-		# src
-		# dst
- 		# if Proto then Port
+		CNT=0
+		SRC=""
+		DST=""
+		PORT=""
+		LASTLINE=""
+		for COL in $LINE
+		do
+			# Proto
+			if [ $CNT -ge 5 ]
+			then
+				if [ "$PROTO" == "" ]
+				then
+					PROTO=$COL
+				elif [ "$SRC" == "" ]
+				then
+					if [ "$COL" == "any" ]
+					then
+						SRC=$COL
+					elif [ "$LASTLINE" != "" ]
+					then
+						SRC="$LASTLINE $COL"
+						LASTLINE=""
+					else
+						LASTLINE=$COL
+					fi
+				elif [ "$DST" == "" ]
+				then
+					if [ "$COL" == "any" ]
+					then
+						DST=$COL
+					elif [ "$LASTLINE" != "" ]
+					then
+						DST="$LASTLINE $COL"
+						LASTLINE=""
+					else
+						LASTLINE=$COL
+					fi
+				else
+					if [ "$COL" != "eq" ]
+					then
+						if [ "$PORT" == "" ]
+						then
+							PORT=$COL
+						else
+							PORT="$PORT $COL"
+						fi
+					fi
+				fi
+			fi
+			CNT=$(($CNT+1))
+		done
+
+                getobjects "$SRC"
+                getobjects "$DST"
+                getobjects "$PORT"
+
 	done < ASA/ACLS/per-int/$ACL
 done
