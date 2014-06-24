@@ -52,10 +52,6 @@ function getips {
 	then
 		ENDLINENO="$"
 	fi
-if [ $OBJGRPLINENO -eq 0 ]
-then
-	echo "$OBJGRP"
-fi
 	local OBJGRPDATA=`sed -n "$OBJGRPLINENO,$ENDLINENO p" PIX/object-group`
 
 	while read LINE
