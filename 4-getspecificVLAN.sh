@@ -46,7 +46,7 @@ function getobjects {
         if [ "$CHK" == object ]
         then
                 OBJ=`echo $INPUT | cut -d " " -f 2`
-                OBJLINENO=`grep -n "$OBJ$" ASA/object | cut -d ":" -f 1`
+                OBJLINENO=`grep -n "object .* $OBJ$" ASA/object | cut -d ":" -f 1`
                 OBJLINENO=$(($OBJLINENO+1))
                 ENDLINENO=`sed -n "$OBJLINENO,$ p" ASA/object | egrep -n "^object" | head -1 | cut -d ":" -f 1`
                 OBJLINENO=$(($OBJLINENO-1))
@@ -59,7 +59,12 @@ function getobjects {
         elif [ "$CHK" == "object-group" ] || [ "$CHK" == "group-object" ]
         then
                 OBJGRP=`echo $INPUT | cut -d " " -f 2`
-                OBJGRPLINENO=`grep -n "object-group .* $OBJGRP" ASA/object-group | cut -d ":" -f 1`
+                OBJGRPLINENO=`grep -n "^object-group .* $OBJGRP$" ASA/object-group`
+		if [ $? -ne 0 ]
+		then
+			 OBJGRPLINENO=`grep -n "^object-group .* $OBJGRP " ASA/object-group`
+		fi
+		OBJGRPLINENO=`echo $OBJGRPLINENO | cut -d ":" -f 1`
                 OBJGRPLINENO=$(($OBJGRPLINENO+1))
                 ENDLINENO=`sed -n "$OBJGRPLINENO,$ p" ASA/object-group | egrep -n "^object-group" | head -1 | cut -d ":" -f 1`
                 OBJGRPLINENO=$(($OBJGRPLINENO-1))

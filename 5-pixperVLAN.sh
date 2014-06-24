@@ -52,6 +52,10 @@ function getips {
 	then
 		ENDLINENO="$"
 	fi
+if [ $OBJGRPLINENO -eq 0 ]
+then
+	echo "$OBJGRP"
+fi
 	local OBJGRPDATA=`sed -n "$OBJGRPLINENO,$ENDLINENO p" PIX/object-group`
 
 	while read LINE
@@ -85,15 +89,17 @@ function getips {
 	progress_bar
 }
 
-if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ]
+if [ "$1" == "" ] || [ "$2" == "" ] || [ "$3" == "" ] || [ "$4" == "" ] || [ "$5" == "" ]
 then
-        echo "Usage: 3-getspecificVLAN.sh <PIX_CONFIG_FILE> <Inside Interface> <Outside Interface>"
+        echo "Usage: 3-getspecificVLAN.sh <PIX_CONFIG_FILE> <Inside Interface> <Outside Interface> <New Outside ACL name> <outside ACL start number>"
         exit 1
 fi
 
 CONFIG=$1
 ININTERFACE=$2
 OUTINTERFACE=$3
+ACLNAME=$4
+ACLSTART=$5
 
 # get the interface details
 INIFLINENOFULL=`grep $ININTERFACE $CONFIG -n`
@@ -187,13 +193,14 @@ do
 			then
 				if [ "$ITEM" == "object-group" ]
 				then
-					LASTITME="$ITEM"
+					LASTITEM="$ITEM"
 				else
 					if [ "$LASTITEM" = "" ]
 					then
 						PROTO="$ITEM"
 					else
 						PROTO="$LASTITEM $ITEM"
+						LASTITEM=""
 					fi
 				fi	
 			elif [ "$SRC" == "" ] && [ "$ITEM" == "any" ]
@@ -339,5 +346,156 @@ sed -i "s/ /\n/g" .tmp-ipsnobjectgroups
 sed -i '/^\s*$/d' .tmp-ipsnobjectgroups
 grep -f .tmp-ipsnobjectgroups PIX/ACLS/$OUTACL > PIX/per-int/outside
 
+OBJECTGROUPS=""
+IPS=""
+
+while read ACLLINE
+do
+        TST=`echo $ACLLINE | grep -c "access-list $INACL remark"`
+        if [ $TST -gt 0 ]
+        then
+                continue
+        fi
+        CNT=0
+        PROTO=""
+        SRC=""
+        DST=""
+        PORT=""
+        LASTITEM=""
+        for ITEM in $ACLLINE
+        do
+                if [ $CNT -ge 4 ]
+                then
+                        if [ "$PROTO" == "" ]
+                        then
+                                if [ "$ITEM" == "object-group" ]
+                                then
+                                        LASTITEM="$ITEM"
+                                else
+                                        if [ "$LASTITEM" = "" ]
+                                        then
+                                                PROTO="$ITEM"
+                                        else
+                                                PROTO="$LASTITEM $ITEM"
+						LASTITEM=""
+                                        fi
+                                fi
+                        elif [ "$SRC" == "" ] && [ "$ITEM" == "any" ]
+                        then
+                                SRC="$ITEM"
+                        elif [ "$SRC" == "" ] && [ "$LASTITEM" == "" ]
+                        then
+                                LASTITEM="$ITEM"
+                        elif [ "$SRC" = "" ]
+                        then
+                                SRC="$LASTITEM $ITEM"
+                                LASTITEM=""
+                        elif [ "$DST" == "" ] && [ "$ITEM" == "any" ]
+                        then
+                                DST="$ITEM"
+                        elif [ "$DST" == "" ] && [ "$LASTITEM" == "" ]
+                        then
+                                LASTITEM="$ITEM"
+                        elif [ "$DST" == "" ]
+                        then
+                                DST="$LASTITEM $ITEM"
+                                LASTITEM=""
+                        elif [ "$PORT" == "" ] && [ "$LASTITEM" == "" ]
+                        then
+                                LASTITEM="$ITEM"
+                        elif [ "$PORT" == "" ]
+                        then
+                                PORT="$LASTITEM $ITEM"
+                                LASTITEM=""
+                        fi
+                fi
+                CNT=$(($CNT+1))
+                progress_bar
+        done
+
+        TST=`echo $SRC | cut -d " " -f 1`
+        if [ "$TST" == "object-group" ]
+        then
+                OBJGRP=`echo $SRC | cut -d " " -f 2`
+                OBJECTGROUPS="$OBJECTGROUPS $OBJGRP"
+        elif [ "$TST" == "host" ]
+        then
+                NAME=`echo $SRC | cut -d " " -f 2`
+                IPS="$IPS $NAME"
+        elif [ "$TST" != "any" ]
+        then
+                IPS="$IPS $TST"
+        fi
+
+        TST=`echo $DST | cut -d " " -f 1`
+        if [ "$TST" == "object-group" ]
+        then
+                OBJGRP=`echo $DST | cut -d " " -f 2`
+                OBJECTGROUPS="$OBJECTGROUPS $OBJGRP"
+        elif [ "$TST" == "host" ]
+        then
+                NAME=`echo $DST | cut -d " " -f 2`
+                IPS="$IPS $NAME"
+        elif [ "$TST" != "any" ]
+        then
+                IPS="$IPS $TST"
+        fi
+
+        TST=`echo $PORT | cut -d " " -f 1`
+        if [ "$TST" == "object-group" ]
+        then
+                OBJGRP=`echo $PORT | cut -d " " -f 2`
+                OBJECTGROUPS="$OBJECTGROUPS $OBJGRP"
+        elif [ "$TST" == "host" ]
+        then
+                NAME=`echo $PORT | cut -d " " -f 2`
+                IPS="$IPS $NAME"
+        elif [ "$TST" != "log" ] && [ "$TST" != "eq" ]
+        then
+                IPS="$IPS $TST"
+        fi
+
+	TST=`echo $PROTO | cut -d " " -f 1`
+	if [ "$TST" == "object-group" ]
+	then
+		OBJGRP=`echo $PROTO | cut -d " " -f 2`
+		OBJECTGROUPS="$OBJECTGROUPS $OBJGRP"
+	fi
+done < PIX/per-int/outside
+PROGRESS=99
+progress_bar
+
+echo "Extract IPS from object groups"
+for OBJGRP in $OBJECTGROUPS
+do
+        getips "$OBJGRP"
+done
+
+
+
 # renumber lines for acl
+sed -i "s/access-list $OUTACL /access-list $ACLNAME /" PIX/per-int/outside
+
+rm -rf .tmp-outside
+while read LINE
+do
+	echo "$LINE" | sed "s/ extended / extended line $ACLSTART /" >> .tmp-outside
+	ACLSTART=$(($ACLSTART+1))
+done < PIX/per-int/outside
+
+mv .tmp-outside PIX/per-int/outside
+
+# update DM_INLINE object groups to not overlap with existing i.e. prefix with 99
+sed -i "s/DM_INLINE_NETWORK_/DM_INLINE_NETWORK_99/" PIX/per-int/object-group
+sed -i "s/DM_INLINE_NETWORK_/DM_INLINE_NETWORK_99/" PIX/per-int/$INACL
+sed -i "s/DM_INLINE_NETWORK_/DM_INLINE_NETWORK_99/" PIX/per-int/outside
+sed -i "s/DM_INLINE_SERVICE_/DM_INLINE_SERVICE_99/" PIX/per-int/object-group
+sed -i "s/DM_INLINE_SERVICE_/DM_INLINE_SERVICE_99/" PIX/per-int/$INACL
+sed -i "s/DM_INLINE_SERVICE_/DM_INLINE_SERVICE_99/" PIX/per-int/outside
+sed -i "s/DM_INLINE_TCP_/DM_INLINE_TCP_99/" PIX/per-int/object-group
+sed -i "s/DM_INLINE_TCP_/DM_INLINE_TCP_99/" PIX/per-int/$INACL
+sed -i "s/DM_INLINE_TCP_/DM_INLINE_TCP_99/" PIX/per-int/outside
+sed -i "s/DM_INLINE_UDP_/DM_INLINE_UDP_99/" PIX/per-int/object-group
+sed -i "s/DM_INLINE_UDP_/DM_INLINE_UDP_99/" PIX/per-int/$INACL
+sed -i "s/DM_INLINE_UDP_/DM_INLINE_UDP_99/" PIX/per-int/outside
 
