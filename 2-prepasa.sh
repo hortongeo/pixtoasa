@@ -322,97 +322,104 @@ do
         then
                 while read ACLLINE
                 do
-                        PROTO=`echo $ACLLINE | cut -d " " -f 5`
-                        OBJGROUPCHK=`echo $ACLLINE | cut -d " " -f 6`
-                        SOURCE=`echo $ACLLINE | cut -d " " -f 7`
-                        if [ "$OBJGROUPCHK" == "any" ]
-                        then
-                                SOURCE=$OBJGROUPCHK
-                        elif [ "$OBJGROUPCHK" != "object-group" ]
-                        then
-                                SOURCELINENO=`grep -n "$OBJGROUPCHK $SOURCE" ASA/object`
-                                if [ $? -eq 0 ]
-                                then
-                                        SOURCELINENO=`echo $SOURCELINENO |  cut -d ":" -f 1`
-                                        SOURCELINENO=$(($SOURCELINENO-1))q
-                                        SOURCE=`sed "$SOURCELINENO;d" ASA/object | cut -d " " -f 3`
-                                else
-                                        PREFIX=`ipcalc -p $OBJGROUPCHK $SOURCE | cut -d "=" -f 2`
-                                        echo -e "object network net-$OBJGROUPCHK-$PREFIX\n subnet $OBJGROUPCHK $SOURCE" >> ASA/object
-                                        SOURCE="net-$OBJGROUPCHK-$PREFIX"
-                                fi
-                        fi
-			progress_bar
+			if [[ "$ACLLINE" != *"remark"* ]]
+			then
+	                        PROTO=`echo $ACLLINE | cut -d " " -f 5`
+	                        OBJGROUPCHK=`echo $ACLLINE | cut -d " " -f 6`
+	                        SOURCE=`echo $ACLLINE | cut -d " " -f 7`
+	                        if [ "$OBJGROUPCHK" == "any" ]
+	                        then
+	                                SOURCE=$OBJGROUPCHK
+	                        elif [ "$OBJGROUPCHK" != "object-group" ]
+	                        then
+	                                SOURCELINENO=`grep -n "$OBJGROUPCHK $SOURCE" ASA/object`
+	                                if [ $? -eq 0 ]
+	                                then
+	                                        SOURCELINENO=`echo $SOURCELINENO |  cut -d ":" -f 1`
+	                                        SOURCELINENO=$(($SOURCELINENO-1))q
+	                                        SOURCE=`sed "$SOURCELINENO;d" ASA/object | cut -d " " -f 3`
+					elif [ "$OBJGROUPCHK" == "host" ]
+					then
+						echo -e "object network srv-$OBJGROUPCHK\n host $SOURCE" >> ASA/object
+						SOURCE="srv-$OBJGROUPCHK"
+	                                else
+	                                        PREFIX=`ipcalc -p $OBJGROUPCHK $SOURCE | cut -d "=" -f 2`
+	                                        echo -e "object network net-$OBJGROUPCHK-$PREFIX\n subnet $OBJGROUPCHK $SOURCE" >> ASA/object
+	                                        SOURCE="net-$OBJGROUPCHK-$PREFIX"
+	                                fi
+	                        fi
+				progress_bar
 
-                        OBJGROUPCHK=`echo $ACLLINE | cut -d " " -f 8`
-                        DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
-                        if [ "$OBJGROUPCHK" == "any" ]
-                        then
-                                DESTINATION=$OBJGROUPCHK
-                        elif [ "$OBJGROUPCHK" != "object-group" ]
-                        then
-                                DESTINATIONLINENO=`grep -n "$OBJGROUPCHK $DESTINATION" ASA/object`
-                                if [ $? -eq 0 ]
-                                then
-                                        DESTINATIONLINENO=`echo $DESTINATIONLINENO |  cut -d ":" -f 1`
-                                        DESTINATIONLINENO=$(($DESTINATIONLINENO-1))q
-                                        DESTINATION=`sed "$DESTINATIONLINENO;d" ASA/object | cut -d " " -f 3`
-                                else
-                                        PREFIX=`ipcalc -p $OBJGROUPCHK $DESTINATION | cut -d "=" -f 2`
-                                        echo -e "object network net-$OBJGROUPCHK-$PREFIX\n subnet $OBJGROUPCHK $DESTINATION" >> ASA/object
-                                        DESTINATION="net-$OBJGROUPCHK-$PREFIX"
-                                fi
-                        fi
-			progress_bar
+	                        OBJGROUPCHK=`echo $ACLLINE | cut -d " " -f 8`
+	                        DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
+	                        if [ "$OBJGROUPCHK" == "any" ]
+	                        then
+	                                DESTINATION=$OBJGROUPCHK
+	                        elif [ "$OBJGROUPCHK" != "object-group" ]
+	                        then
+	                                DESTINATIONLINENO=`grep -n "$OBJGROUPCHK $DESTINATION" ASA/object`
+	                                if [ $? -eq 0 ]
+	                                then
+	                                        DESTINATIONLINENO=`echo $DESTINATIONLINENO |  cut -d ":" -f 1`
+	                                        DESTINATIONLINENO=$(($DESTINATIONLINENO-1))q
+	                                        DESTINATION=`sed "$DESTINATIONLINENO;d" ASA/object | cut -d " " -f 3`
+	                                else
+	                                        PREFIX=`ipcalc -p $OBJGROUPCHK $DESTINATION | cut -d "=" -f 2`
+	                                        echo -e "object network net-$OBJGROUPCHK-$PREFIX\n subnet $OBJGROUPCHK $DESTINATION" >> ASA/object
+	                                        DESTINATION="net-$OBJGROUPCHK-$PREFIX"
+	                                fi
+	                        fi
+				progress_bar
 
-                        if [ "$PROTO" != "ip" ]
-                        then
-                                PORT=`echo $ACLLINE | cut -d " " -f 10`
-                                # try to find the port object first
-                                PORTLINENO=`grep -n " service $PROTO destination eq $PORT" ASA/object`
-                                if [ $? -eq 0 ]
-                                then
-                                        PORTLINENO=`echo $PORTLINENO | cut -d ":" -f 1`
-                                        PORTLINENO=$(($PORTLINENO-1))q
-                                        PORTOBJ=`sed "$PORTLINENO;d" ASA/object | cut -d " " -f 3`
-                                else
-                                        echo -e "object service $PROTO-$PORT\n service $PROTO destination eq $PORT" >> ASA/object
-                                        PORTOBJ="$PROTO-$PORT"
-                                fi
-                        else
-                                PORTOBJ=""
-                        fi
-			progress_bar
+	                        if [ "$PROTO" != "ip" ]
+	                        then
+	                                PORT=`echo $ACLLINE | cut -d " " -f 10`
+	                                # try to find the port object first
+	                                PORTLINENO=`grep -n " service $PROTO destination eq $PORT" ASA/object`
+	                                if [ $? -eq 0 ]
+	                                then
+	                                        PORTLINENO=`echo $PORTLINENO | cut -d ":" -f 1`
+	                                        PORTLINENO=$(($PORTLINENO-1))q
+	                                        PORTOBJ=`sed "$PORTLINENO;d" ASA/object | cut -d " " -f 3`
+	                                else
+	                                        echo -e "object service $PROTO-$PORT\n service $PROTO destination eq $PORT" >> ASA/object
+	                                        PORTOBJ="$PROTO-$PORT"
+	                                fi
+	                        else
+	                                PORTOBJ=""
+		                fi
+				progress_bar
 
-                        if [ $GLOBAL -eq 0 ]
-                        then
-                                #NAT EXEMPT
-                                echo "nat ($INT,any) source static $SOURCE $SOURCE destination static $DESTINATION $DESTINATION" >> ASA/NAT/exempt
-                        else
-                                #Dynamic NAT
-                                # Get the global ip
-                                GLOBALIP=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 4`
-                                OTHERINT=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 2 | sed "s/[\(\)]//g"`
-                                # get the object name
-                                IPLINENO=`grep -n " $GLOBALIP" ASA/object`
-                                if [ $? -eq 0 ]
-                                then
-                                        IPLINENO=`echo $IPLINENO | cut -d ":" -f 1`
-                                        IPLINENO=$(($IPLINENO-1))q
-                                        OBJ=`sed "$IPLINENO;d" ASA/object | cut -d " " -f 3`
-                                else
-                                        echo -e "object network srv-$GLOBALIP\n host $GLOVALIP"
-                                        OBJ="srv-$GLOBALIP"
-                                fi
-
-                                if [ "$PORTOBJ" == "" ]
-                                then
-                                        echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ" >> ASA/NAT/dynamic
-                                else
-                                         echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ service $PORTOBJ $PORTOBJ" >> ASA/NAT/dynamic
-                                fi
-                        fi
-			progress_bar
+	                        if [ $GLOBAL -eq 0 ]
+	                        then
+	                                #NAT EXEMPT
+	                                echo "nat ($INT,any) source static $SOURCE $SOURCE destination static $DESTINATION $DESTINATION" >> ASA/NAT/exempt
+	                        else
+		                        #Dynamic NAT
+	                                # Get the global ip
+	                                GLOBALIP=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 4`
+	                                OTHERINT=`grep " $GLOBAL " PIX/NAT/global | cut -d " " -f 2 | sed "s/[\(\)]//g"`
+	                                # get the object name
+	                                IPLINENO=`grep -n " $GLOBALIP" ASA/object`
+	                                if [ $? -eq 0 ]
+	                                then
+	                                        IPLINENO=`echo $IPLINENO | cut -d ":" -f 1`
+	                                        IPLINENO=$(($IPLINENO-1))q
+	                                        OBJ=`sed "$IPLINENO;d" ASA/object | cut -d " " -f 3`
+	                                else
+	                                        echo -e "object network srv-$GLOBALIP\n host $GLOVALIP"
+	                                        OBJ="srv-$GLOBALIP"
+	                                fi
+	
+	                                if [ "$PORTOBJ" == "" ]
+	                                then
+	                                        echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ" >> ASA/NAT/dynamic
+	                                else
+	                                        echo "nat ($INT,$OTHERINT) source dynamic $SOURCE $OBJ service $PORTOBJ $PORTOBJ" >> ASA/NAT/dynamic
+	                                fi
+	                        fi
+				progress_bar
+			fi
                 done < PIX/NAT/ACLS/$ACL
         else
                 SOURCELINENO=`grep -n "$ACLCHECK $ACL" ASA/object`
@@ -477,76 +484,82 @@ do
                 ACL=`echo $STATIC | cut -d " " -f 5`
                 while read ACLLINE
                 do
-                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 6`
-                        if [ "$HOSTCHK" == "host" ]
-                        then
-                                SOURCE=`echo $ACLLINE | cut -d " " -f 7`
-                        else
-                                SOURCE=`echo $ACLLINE | cut -d " " -f 6,7`
-                        fi
+			if [[ "$ACLLINE" != *"remark"* ]]
+			then
+	                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 6`
+	                        if [ "$HOSTCHK" == "host" ]
+	                        then
+	                                SOURCE=`echo $ACLLINE | cut -d " " -f 7`
+	                        else
+	                                SOURCE=`echo $ACLLINE | cut -d " " -f 6,7`
+	                        fi
 
-			progress_bar
-                        SOURCELINENO=`grep -n " $SOURCE$" ASA/object`
-                        if [ $? -eq 0 ]
-                        then
-                                SOURCELINENO=`echo $SOURCELINENO | cut -d ":" -f 1`
-                                SOURCELINENO=$(($SOURCELINENO-1))q
-                                SOURCEOBJ=`sed "$SOURCELINENO;d" ASA/object | cut -d " " -f 3`
-                        else
-                                if [ "$HOSTCHK" == "host" ]
-                                then
-                                        echo -e "object network srv-$SOURCE\n host $SOURCE"
-                                        SOURCEOBJ="srv-$SOURCE"
-                                else
-                                        PREFIX=`ipcalc -p $SOURCE`
-                                        echo -e "object network net-$SOURCE\n subnet $SOURCE"
-                                        SOURCEOBJ="net-$SOURCE"
-                                fi
-                        fi
+				progress_bar
+	                        SOURCELINENO=`grep -n " $SOURCE$" ASA/object`
+	                        if [ $? -eq 0 ]
+	                        then
+	                                SOURCELINENO=`echo $SOURCELINENO | cut -d ":" -f 1`
+	                                SOURCELINENO=$(($SOURCELINENO-1))q
+	                                SOURCEOBJ=`sed "$SOURCELINENO;d" ASA/object | cut -d " " -f 3`
+	                        else
+	                                if [ "$HOSTCHK" == "host" ]
+	                                then
+	                                        echo -e "object network srv-$SOURCE\n host $SOURCE" >> ASA/object
+	                                        SOURCEOBJ="srv-$SOURCE"
+	                                else
+	                                        PREFIX=`ipcalc -p $SOURCE | cut -d "=" -f 2`
+	                                        echo -e "object network net-$SOURCE-$PREFIX\n subnet $SOURCE" >> ASA/object
+	                                        SOURCEOBJ="net-$SOURCE"
+	                                fi
+	                        fi
 
-			progress_bar
-                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 8`
-                        if [ "$HOSTCHK" == "host" ]
-                        then
-                                DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
-                        else
-                                DESTINATION=`echo $ACLLINE | cut -d " " -f 8,9`
-                        fi
+				progress_bar
+	                        HOSTCHK=`echo $ACLLINE | cut -d " " -f 8`
+	                        if [ "$HOSTCHK" == "host" ]
+	                        then
+	                                DESTINATION=`echo $ACLLINE | cut -d " " -f 9`
+	                        else
+	                                DESTINATION=`echo $ACLLINE | cut -d " " -f 8,9`
+	                        fi
 
-			progress_bar
-                        DESTLINENO=`grep -n " $DESTINATION$" ASA/object`
-                        if [ $? -eq 0 ]
-                        then
-                                DESTLINENO=`echo $DESTLINENO | cut -d ":" -f 1`
-                                DESTLINENO=$(($DESTLINENO-1))q
-                                DESTOBJ=`sed "$DESTLINENO;d" ASA/object | cut -d " " -f 3`
-                        else
-                                if [ "$HOSTCHK" == "host" ]
-                                then
-                                        echo -e "object network srv-$DESTINATION\n host $DESTINATION"
-                                        DESTOBJ="srv-$DESTINATION"
-                                else
-                                        PREFIX=`ipcalc -p $DESTINATION`
-                                        echo -e "object network net-$DESTINATION\n subnet $DESTINATION"
-                                        DESTOBJ="net-$DESTINATION"
-                                fi
-                        fi
+				progress_bar
+	                        DESTLINENO=`grep -n " $DESTINATION$" ASA/object`
+	                        if [ $? -eq 0 ]
+	                        then
+	                                DESTLINENO=`echo $DESTLINENO | cut -d ":" -f 1`
+	                                DESTLINENO=$(($DESTLINENO-1))q
+	                                DESTOBJ=`sed "$DESTLINENO;d" ASA/object | cut -d " " -f 3`
+	                        else
+	                                if [ "$HOSTCHK" == "host" ]
+	                                then
+	                                        echo -e "object network srv-$DESTINATION\n host $DESTINATION" >> ASA/object
+	                                        DESTOBJ="srv-$DESTINATION"
+					elif [[ "$DESTINATION" == *"object-group"* ]]
+					then
+						DESTOBJ=`echo $DESTINATION | cut -d " " -f 2`
+	                                else
+	                                        PREFIX=`ipcalc -p $DESTINATION | cut -d "+" -f 2`
+	                                        echo -e "object network net-$DESTINATION-$PREFIX\n subnet $DESTINATION" >> ASA/object
+	                                        DESTOBJ="net-$DESTINATION"
+	                                fi
+	                        fi
 
-			progress_bar
-                        OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
-                        if [ $? -eq 0 ]
-                        then
-                                OUTSIDEIPLINE=`echo $OUTSIDEIPLINE | cut -d ":" -f 1`
-                                OUTSIDEIPLINE=$(($OUTSIDEIPLINE-1))q
-                                OUTSIDEOBJ=`sed "$OUTSIDEIPLINE;d" ASA/object | cut -d " " -f 3`
-                        else
-                                echo -e "object network srv-$OUTSIDEIP\n host $OUTSIDEIP" >> ASA/object
-                                OUTSIDEOBJ="srv-$OUTSIDEIP"
-                        fi
+				progress_bar
+	                        OUTSIDEIPLINE=`grep -n " $OUTSIDEIP" ASA/object`
+	                        if [ $? -eq 0 ]
+	                        then
+	                                OUTSIDEIPLINE=`echo $OUTSIDEIPLINE | cut -d ":" -f 1`
+	                                OUTSIDEIPLINE=$(($OUTSIDEIPLINE-1))q
+	                                OUTSIDEOBJ=`sed "$OUTSIDEIPLINE;d" ASA/object | cut -d " " -f 3`
+	                        else
+	                                echo -e "object network srv-$OUTSIDEIP\n host $OUTSIDEIP" >> ASA/object
+	                                OUTSIDEOBJ="srv-$OUTSIDEIP"
+	                        fi
 
-			progress_bar
-                        echo "nat ($INSIDEIF,$OUTSIDEIF) source static $SOURCEOBJ $OUTSIDEOBJ destination static $DESTOBJ $DESTOBJ" >> ASA/NAT/static
+				progress_bar
+	                        echo "nat ($INSIDEIF,$OUTSIDEIF) source static $SOURCEOBJ $OUTSIDEOBJ destination static $DESTOBJ $DESTOBJ" >> ASA/NAT/static
 
+			fi
                 done < PIX/NAT/ACLS/$ACL
 		progress_bar
         else
